@@ -27,23 +27,36 @@
 # remove all pre-existing variables in the workspace
 rm(list=ls())
 
-threshold = 13.1
+threshold = 10
 accumulated_threshold = 500
 
 # load files: put the desired files for analysis into one folder and include the file path for that folder below.
 # Multiple files can be read at once.
-allfiles <- list.files(path = "set input file path", full.names = TRUE)
-temperature <- do.call(rbind, lapply(allfiles, read.csv, header = TRUE, sep = ";"))
+#allfiles <- list.files(path = "set input file path", full.names = TRUE)
+#temperature <- do.call(rbind, lapply(allfiles, read.csv, header = TRUE, sep = ";"))
+library(tidyverse)
+t1 <- read_delim("../pest-risk/input/jrc-gridded-agrometeo/efsa20180420.csv",delim = ";")
 
-# Remove duplicate values (this happens where one grid cell spans two countries)
-# This step is slow, so if only using data from one country, don't run this line of code.
-temperature <- unique(temperature)
+temperature <-t1 %>%
+  bind_rows(read_delim("../pest-risk/input/jrc-gridded-agrometeo/efsa20180613.csv",delim = ";")) %>%
+  rename(GRID_NO=IDGRID,
+         TEMPERATURE_MIN=TMIN,
+         TEMPERATURE_MAX=TMAX) %>%
+  select(GRID_NO,TEMPERATURE_MIN,TEMPERATURE_MAX,DAY) %>% 
+  distinct(GRID_NO,DAY,.keep_all = T)
+rm(t1)
+
 
 # add mean temp to dataset
 temperature$mean <- (temperature$TEMPERATURE_MAX + temperature$TEMPERATURE_MIN)/2
 
 # extract the text date string for year and add this to the dataset
 temperature$year <- substr(temperature$DAY, 1, 4)
+
+# filter years
+#temperature <- temperature %>% 
+#  filter(as.numeric(year)<2015) %>% 
+#  filter(as.numeric(year)>1999)
 
 # select days where max temperature equal to or below threshold
 below <- temperature[temperature$TEMPERATURE_MAX <= threshold, ]
@@ -203,5 +216,6 @@ final_sort$mean_annual_generation <- final_sort$mean/accumulated_threshold
 
 # export the file: default location as specified, including the two threshold values in the filename
 filename <- paste("set output file path",
-  threshold, "_accumulatedDD-", accumulated_threshold, ".csv", sep = "")
+  threshold, "_accumulatedDD-", accumulated_threshold, "-20y.csv", sep = "")
 write.csv(final_sort, file = filename)
+
